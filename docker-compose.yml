@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: stem
+      POSTGRES_PASSWORD: stem
+      POSTGRES_DB: stemsaas
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stem -d stemsaas"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgres://stem:stem@db:5432/stemsaas
+      DJANGO_SECRET_KEY: change-me-in-prod
+      JWT_SECRET: change-me-in-prod
+      DJANGO_DEBUG: "true"
+      STORAGE_DIR: /app/storage
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./storage:/app/storage
+
+volumes:
+  pgdata:

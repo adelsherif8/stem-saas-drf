@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: stem
+          POSTGRES_PASSWORD: stem
+          POSTGRES_DB: stemsaas
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U stem"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://stem:stem@localhost:5432/stemsaas
+      DJANGO_SECRET_KEY: ci-only-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - name: System checks + missing migrations
+        run: |
+          python manage.py check
+          python manage.py makemigrations --check --dry-run
+      - name: OpenAPI schema is valid
+        run: python manage.py spectacular --validate --fail-on-warn --file /tmp/schema.yml
+      - name: Tests (Postgres)
+        run: pytest -q
